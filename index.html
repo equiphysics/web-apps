@@ -294,7 +294,7 @@ const GAITS = {
   trot:   { phases: [0.00, 0.50, 0.50, 0.00], duty: 0.47, desc: "Trot: 2-beat diagonal gait. LH+RF move together, then RH+LF." },
   pace:   { phases: [0.00, 0.50, 0.00, 0.50], duty: 0.45, desc: "Pace: 2-beat lateral gait. LH+LF move together, then RH+RF." },
   bound:  { phases: [0.00, 0.00, 0.50, 0.50], duty: 0.42, desc: "Bound: LF+RF move together, then LH+RH." },
-  gallop: { phases: [0.00, 0.15, 0.45, 0.60], duty: 0.25, desc: "Gallop: 4-beat asymmetric gait with a suspension phase at the end of each stride. Right lead: LH → RH → LF → RF → Suspension. Left lead is the mirror." },
+  gallop: { phases: [0.00, 0.10, 0.45, 0.55], duty: 0.25, desc: "Gallop: 4-beat asymmetric gait. Right lead: LH → RH → (gathered suspension) → LF → RF → (extension suspension). The gathered moment is small; the extension suspension is the big airborne one." },
 };
 
 const LIMB_NAMES = ["LH", "RH", "LF", "RF"];
@@ -304,7 +304,7 @@ const LIMB_COLORS = {
 
 // ============================================================
 // ODE state: 4 coupled phase oscillators (Kuramoto-style)
-// dθ_i/dt = ω + (K/3) Σ sin((θ_j - θ_i) - (φ*_j - φ*_i))
+// dθ_i/dt = ω + (K/3) Σ_{j=1..4, j≠i} sin((θ_j - θ_i) - (φ*_j - φ*_i))
 // ============================================================
 let theta = [0, 0.5*2*Math.PI, 0.25*2*Math.PI, 0.75*2*Math.PI];
 let targetPhases = [...GAITS.walk.phases];
@@ -488,7 +488,7 @@ function drawPhaseCircle() {
   ctx.fillStyle = "#666";
   ctx.font = "11px ui-monospace, monospace";
   ctx.textAlign = "left";
-  ctx.fillText("dθᵢ/dt = ω + (K/3) Σ sin((θⱼ−θᵢ) − (φⱼ*−φᵢ*))", 8, h - 8);
+  ctx.fillText("dθᵢ/dt = ω + (K/3) Σⱼ≠ᵢ sin((θⱼ−θᵢ) − (φⱼ*−φᵢ*))", 8, h - 8);
 }
 
 // ============================================================
