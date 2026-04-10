@@ -215,6 +215,11 @@
       <label><span>Speed ω</span><span class="val" id="wVal">1.0×</span></label>
       <input type="range" id="wSlider" min="0.2" max="3" step="0.05" value="1.0">
     </div>
+    <div class="slider-row">
+      <label><span>Duty factor (fraction on ground)</span><span class="val" id="dVal">0.62</span></label>
+      <input type="range" id="dSlider" min="0.10" max="0.90" step="0.01" value="0.62">
+    </div>
+    <p class="info-text" style="margin-top:-4px;">Lower duty = more time airborne. Try a low duty with trot or pace to see suspension.</p>
 
     <div id="customPhases" style="display:none;">
       <p class="info-text" style="margin-top:10px;">Target phase offsets (fraction of stride):</p>
@@ -492,7 +497,8 @@ function drawPhaseCircle() {
 // so transitions between gaits are visible (not a pop).
 // ============================================================
 let simPhase = 0; // continuous elapsed strides (monotonic)
-function currentDuty() { return GAITS[currentGait].duty; }
+let userDuty = GAITS.walk.duty;
+function currentDuty() { return userDuty; }
 
 // Per-limb history of completed stance intervals [{start, end}, ...]
 const stanceEvents = [[], [], [], []];
@@ -684,6 +690,12 @@ function selectGait(name) {
   document.getElementById("rhVal").textContent = targetPhases[1].toFixed(2);
   document.getElementById("lfVal").textContent = targetPhases[2].toFixed(2);
   document.getElementById("rfVal").textContent = targetPhases[3].toFixed(2);
+  // Reset duty factor to this gait's natural default
+  userDuty = GAITS[name].duty;
+  const dSlider = document.getElementById("dSlider");
+  const dVal = document.getElementById("dVal");
+  if (dSlider) { dSlider.value = userDuty; }
+  if (dVal) { dVal.textContent = userDuty.toFixed(2); }
 }
 
 document.querySelectorAll("#gaitButtons button").forEach(btn => {
@@ -697,6 +709,10 @@ document.getElementById("kSlider").addEventListener("input", e => {
 document.getElementById("wSlider").addEventListener("input", e => {
   omegaMult = parseFloat(e.target.value);
   document.getElementById("wVal").textContent = omegaMult.toFixed(2) + "\u00d7";
+});
+document.getElementById("dSlider").addEventListener("input", e => {
+  userDuty = parseFloat(e.target.value);
+  document.getElementById("dVal").textContent = userDuty.toFixed(2);
 });
 
 ["rh", "lf", "rf"].forEach((limb, idx) => {
