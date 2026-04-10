@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Horse Gait Lab</title>
+<style>
+  :root {
+    --LH: #2e7d32;
+    --RH: #ef6c00;
+    --LF: #1565c0;
+    --RF: #c62828;
+    --bg: #faf9f7;
+    --card: #ffffff;
+    --text: #222;
+    --muted: #666;
+    --border: #e3e0da;
+    --accent: #6a1b9a;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 15px;
+    line-height: 1.4;
+  }
+  header {
+    background: var(--accent);
+    color: white;
+    padding: 14px 16px;
+    text-align: center;
+  }
+  header h1 { margin: 0; font-size: 18px; font-weight: 600; }
+  header p { margin: 2px 0 0; font-size: 12px; opacity: 0.85; }
+  main {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 12px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+  }
+  .card h2 {
+    margin: 0 0 10px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .gait-buttons {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+  }
+  .gait-buttons button {
+    padding: 10px 4px;
+    border: 1px solid var(--border);
+    background: #f7f5f0;
+    color: var(--text);
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .gait-buttons button.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+  .slider-row {
+    margin: 10px 0;
+  }
+  .slider-row label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    margin-bottom: 4px;
+  }
+  .slider-row .val {
+    font-family: ui-monospace, Menlo, monospace;
+    color: var(--muted);
+  }
+  input[type="range"] {
+    width: 100%;
+    -webkit-appearance: none;
+    height: 6px;
+    background: #ddd;
+    border-radius: 3px;
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 22px; height: 22px;
+    background: var(--accent);
+    border-radius: 50%;
+    cursor: pointer;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 22px; height: 22px;
+    background: var(--accent);
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+  }
+  .phase-slider::-webkit-slider-thumb { background: var(--thumb, var(--accent)); }
+  .phase-slider::-moz-range-thumb { background: var(--thumb, var(--accent)); }
+  canvas { display: block; width: 100%; touch-action: manipulation; }
+  .legend {
+    display: flex;
+    justify-content: space-around;
+    font-size: 12px;
+    margin-top: 6px;
+  }
+  .legend span::before {
+    content: "■";
+    margin-right: 3px;
+  }
+  .legend .lh { color: var(--LH); }
+  .legend .rh { color: var(--RH); }
+  .legend .lf { color: var(--LF); }
+  .legend .rf { color: var(--RF); }
+  .tab-row {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 8px;
+  }
+  .tab-row button {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid var(--border);
+    background: #f7f5f0;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .tab-row button.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+  .info-text {
+    font-size: 12px;
+    color: var(--muted);
+    margin: 4px 0 0;
+  }
+  footer {
+    text-align: center;
+    padding: 16px 8px 24px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>🐴 Horse Gait Lab</h1>
+  <p>Sonia Kovalevsky Day · Math Modeling with ODEs</p>
+</header>
+
+<main>
+
+  <!-- Gait picker -->
+  <div class="card">
+    <h2>1. Pick a Gait</h2>
+    <div class="gait-buttons" id="gaitButtons">
+      <button data-gait="walk">Walk</button>
+      <button data-gait="trot">Trot</button>
+      <button data-gait="pace">Pace</button>
+      <button data-gait="bound">Bound</button>
+      <button data-gait="gallop">Gallop</button>
+    </div>
+    <p class="info-text" id="gaitDescription">Walk: 4-beat gait. Feet hit the ground in sequence: LH → LF → RH → RF.</p>
+  </div>
+
+  <!-- Horse animation -->
+  <div class="card">
+    <h2>2. Watch the Horse</h2>
+    <canvas id="horseCanvas" width="560" height="260"></canvas>
+    <p class="info-text">Top view. Hooves light up when touching the ground. When you switch gaits, the horse takes a moment to transition — how fast depends on the coupling strength K in section 4 (higher K = faster lock-in).</p>
+  </div>
+
+  <!-- Live footfall pattern, synced to the simulation -->
+  <div class="card">
+    <h2>3. Footfall Pattern</h2>
+    <canvas id="footfallCanvas" width="560" height="150"></canvas>
+    <p class="info-text">Each row is one limb. Colored bars show when the hoof is on the ground (stance); gaps are airborne (swing). The pattern scrolls in sync with the horse above, and the vertical line marks right now.</p>
+  </div>
+
+  <!-- Phase circle + controls -->
+  <div class="card">
+    <h2>4. The Math Behind It</h2>
+    <canvas id="phaseCanvas" width="560" height="220"></canvas>
+    <div class="legend">
+      <span class="lh">LH</span>
+      <span class="rh">RH</span>
+      <span class="lf">LF</span>
+      <span class="rf">RF</span>
+    </div>
+    <p class="info-text">Each leg is a spinning clock. Coupling pulls them into a stable pattern.</p>
+
+    <div class="slider-row">
+      <label><span>Coupling strength K</span><span class="val" id="kVal">6.0</span></label>
+      <input type="range" id="kSlider" min="0" max="15" step="0.1" value="6.0">
+    </div>
+    <div class="slider-row">
+      <label><span>Speed ω</span><span class="val" id="wVal">1.0×</span></label>
+      <input type="range" id="wSlider" min="0.2" max="3" step="0.05" value="1.0">
+    </div>
+
+    <div id="customPhases" style="display:none;">
+      <p class="info-text" style="margin-top:10px;">Target phase offsets (fraction of stride):</p>
+      <div class="slider-row">
+        <label><span style="color:var(--RH)">RH offset</span><span class="val" id="rhVal">0.50</span></label>
+        <input type="range" id="rhSlider" class="phase-slider" style="--thumb:var(--RH)" min="0" max="1" step="0.01" value="0.5">
+      </div>
+      <div class="slider-row">
+        <label><span style="color:var(--LF)">LF offset</span><span class="val" id="lfVal">0.25</span></label>
+        <input type="range" id="lfSlider" class="phase-slider" style="--thumb:var(--LF)" min="0" max="1" step="0.01" value="0.25">
+      </div>
+      <div class="slider-row">
+        <label><span style="color:var(--RF)">RF offset</span><span class="val" id="rfVal">0.75</span></label>
+        <input type="range" id="rfSlider" class="phase-slider" style="--thumb:var(--RF)" min="0" max="1" step="0.01" value="0.75">
+      </div>
+    </div>
+    <button id="customBtn" style="width:100%; margin-top:8px; padding:8px; background:#f7f5f0; border:1px solid var(--border); border-radius:6px; font-size:12px; cursor:pointer;">
+      Show custom phase sliders ▼
+    </button>
+  </div>
+
+  <!-- Real data comparison -->
+  <div class="card">
+    <h2>5. Real Horse Data</h2>
+    <div class="tab-row">
+      <button class="dataTab active" data-data="walk">Real walk data</button>
+      <button class="dataTab" data-data="trot">Real trot data</button>
+    </div>
+    <canvas id="dataCanvas" width="560" height="220"></canvas>
+    <p class="info-text" id="dataInfo">80 strides from an actual horse. Each dot = one hoof hitting the ground. Dashed lines = ideal walk.</p>
+  </div>
+
+</main>
+<footer>Built for Sonia Kovalevsky Day · Real data from an EquiPro session</footer>
+
+<script>
+// ============================================================
+// Real horse data (embedded, subsampled from Duque-results.csv)
+// ============================================================
+const ALL_DATA = {"phase":{"walk":{"LH":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"RH":[0.4584,0.5207,0.5068,0.523,0.5126,0.5353,0.4993,0.4678,0.486,0.5223,0.5405,0.5419,0.5051,0.4892,0.4739,0.5202,0.515,0.5219,0.4987,0.4961,0.4811,0.5141,0.4975,0.4626,0.5033,0.5448,0.4658,0.5219,0.5029,0.5229,0.5347,0.5163,0.4815,0.5054,0.5243,0.539,0.5072,0.5077,0.5053,0.4911,0.4628,0.566,0.5186,0.5196,0.5127,0.5464,0.4894,0.4948,0.4946,0.5198,0.5093,0.4956,0.5109,0.5055,0.4991,0.4643,0.4956,0.5173,0.4958,0.5166,0.5175,0.5243,0.5184,0.5178,0.5482,0.5058,0.5137,0.5339,0.504,0.4962,0.5348,0.5224,0.5205,0.4938,0.5138,0.5106,0.4971,0.4357,0.5324,0.4643],"LF":[0.147,0.2815,0.2799,0.2131,0.262,0.2862,0.267,0.2456,0.243,0.2555,0.2742,0.281,0.2707,0.2526,0.2435,0.2921,0.2786,0.2866,0.2473,0.2209,0.2281,0.3016,0.2754,0.217,0.2434,0.2704,0.2002,0.2797,0.2431,0.2573,0.2487,0.2562,0.2428,0.2486,0.2622,0.2532,0.2556,0.2578,0.1981,0.2609,0.2139,0.2753,0.2518,0.2617,0.2619,0.3058,0.2548,0.2606,0.2248,0.2581,0.2584,0.2497,0.2332,0.2387,0.2671,0.2536,0.2663,0.291,0.2461,0.2355,0.2724,0.2551,0.2946,0.2852,0.2582,0.2685,0.2509,0.3051,0.2897,0.2614,0.3018,0.2729,0.2583,0.2748,0.2813,0.2671,0.2602,0.1821,0.268,0.2395],"RF":[0.6789,0.7634,0.783,0.7477,0.7821,0.7621,0.7586,0.768,0.7556,0.7816,0.8068,0.7667,0.7798,0.7458,0.7565,0.8164,0.8148,0.8128,0.7177,0.7629,0.7382,0.8242,0.7976,0.7451,0.7674,0.7783,0.7232,0.7933,0.7585,0.776,0.7544,0.7841,0.7608,0.7871,0.7783,0.7759,0.7628,0.7576,0.7317,0.7521,0.7351,0.7916,0.7591,0.7925,0.7635,0.8032,0.7685,0.7516,0.7494,0.7742,0.7715,0.7269,0.7589,0.7196,0.7944,0.75,0.773,0.7723,0.749,0.7522,0.786,0.7794,0.772,0.7917,0.7865,0.7354,0.7686,0.8028,0.7937,0.7689,0.7793,0.768,0.7632,0.7845,0.7726,0.7933,0.7728,0.6857,0.7825,0.748],"stride_dur_mean":1.2841,"stride_dur_sd":0.0696,"duty_factor_mean":63.61,"n":233},"trot":{"LH":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"RH":[0.4981,0.5065,0.515,0.5285,0.4506,0.4713,0.5075,0.5071,0.4652,0.5049,0.4587,0.4271,0.4337,0.4686,0.4249,0.5179,0.4796,0.4718,0.4434,0.474,0.5172,0.4844,0.4702,0.4441,0.4516,0.4717,0.6074,0.4743,0.511,0.5048,0.6028,0.4494,0.4873,0.5023,0.4461,0.4806,0.5263,0.4831,0.6043,0.5183,0.4863,0.4627,0.5329,0.5599,0.4365,0.4158,0.6129,0.5159,0.5549,0.4789,0.5123,0.4717,0.5796,0.5615,0.5979,0.4806,0.4954,0.5977,0.4417,0.5,0.6195,0.4413,0.3788,0.4289,0.4882,0.4224,0.4917,0.4055,0.6013,0.5276,0.4868,0.4878,0.4575,0.6054,0.4643,0.4241,0.4589,0.5016,0.4622,0.5924],"LF":[0.4981,0.5498,0.521,0.5224,0.4627,0.4713,0.4761,0.5446,0.4713,0.5437,0.4518,0.4407,0.4337,0.4619,0.4519,0.4714,0.4063,0.4448,0.4632,0.4545,0.4779,0.4255,0.4506,0.4306,0.4645,0.4654,0.4898,0.4618,0.4437,0.4345,0.4587,0.4747,0.4304,0.4584,0.4642,0.4928,0.5329,0.4434,0.4664,0.4784,0.4663,0.4498,0.4868,0.5535,0.4821,0.4347,0.489,0.4506,0.5244,0.4342,0.4617,0.5157,0.4473,0.4353,0.4721,0.4563,0.4465,0.4578,0.411,0.443,0.4916,0.4476,0.3853,0.4475,0.4622,0.448,0.4518,0.4376,0.4575,0.521,0.4605,0.4618,0.4575,0.4766,0.4444,0.4562,0.4462,0.4691,0.5077,0.4526],"RF":[0.0121,0.0865,0.0539,0.0425,0.9878,0.0,0.9687,0.0376,0.9939,0.0129,0.007,0.9932,0.98,0.9464,0.0135,0.9734,0.0067,0.9663,0.9934,0.987,0.9804,0.9804,0.9412,0.9865,0.0065,0.9874,0.9739,0.9813,0.9664,0.9936,0.9934,0.0,0.981,0.9749,0.9397,0.0061,0.0789,0.9801,0.9934,0.9867,0.9867,0.9679,0.9868,0.0515,0.987,0.9685,0.9935,0.9739,0.0549,0.9617,0.9747,0.0063,0.9622,0.9558,0.9874,0.9878,0.9633,0.9746,0.9816,0.0,0.0,0.9937,0.8973,0.9689,0.9805,0.9616,0.9934,0.9807,0.0392,0.066,0.9803,0.013,0.0,0.9936,0.9934,0.9807,0.9809,0.987,0.987,0.9734],"stride_dur_mean":0.7759,"stride_dur_sd":0.0265,"duty_factor_mean":46.64,"n":140}},"footfall":{"walk":{"strides":[{"LH":[0.0,0.5925],"RH":[0.4584,0.6073],"LF":[0.147,0.7118],"RF":[0.6789,0.6586]},{"LH":[0.0,0.6455],"RH":[0.5561,0.6004],"LF":[0.2534,0.6976],"RF":[0.7778,0.6515]},{"LH":[0.0,0.6453],"RH":[0.5125,0.6277],"LF":[0.276,0.6786],"RF":[0.7921,0.6436]},{"LH":[0.0,0.6585],"RH":[0.5207,0.625],"LF":[0.2815,0.6842],"RF":[0.7634,0.6597]},{"LH":[0.0,0.6348],"RH":[0.5107,0.6444],"LF":[0.2821,0.6655],"RF":[0.7929,0.6304]},{"LH":[0.0,0.6145],"RH":[0.4868,0.6408],"LF":[0.2649,0.6462],"RF":[0.7624,0.643]},{"LH":[0.0,0.6314],"RH":[0.5409,0.6221],"LF":[0.2811,0.6535],"RF":[0.7758,0.648]},{"LH":[0.0,0.6297],"RH":[0.5145,0.646],"LF":[0.2572,0.6737],"RF":[0.808,0.618]},{"LH":[0.0,0.6197],"RH":[0.4931,0.6296],"LF":[0.278,0.6667],"RF":[0.7785,0.631]},{"LH":[0.0,0.6257],"RH":[0.5293,0.6151],"LF":[0.2703,0.6667],"RF":[0.7921,0.634]},{"LH":[0.0,0.6353],"RH":[0.5068,0.6171],"LF":[0.2799,0.6642],"RF":[0.783,0.6476]},{"LH":[0.0,0.6281],"RH":[0.5282,0.6015],"LF":[0.2913,0.6627],"RF":[0.7883,0.6444]},{"LH":[0.0,0.607],"RH":[0.5191,0.6084],"LF":[0.2557,0.6667],"RF":[0.7519,0.6629]},{"LH":[0.0,0.611],"RH":[0.5323,0.6175],"LF":[0.297,0.6548],"RF":[0.7599,0.6476]},{"LH":[0.0,0.6122],"RH":[0.499,0.6133],"LF":[0.2418,0.6975],"RF":[0.7831,0.6303]},{"LH":[0.0,0.6211],"RH":[0.523,0.5988],"LF":[0.2131,0.6936],"RF":[0.7477,0.6463]},{"LH":[0.0,0.64],"RH":[0.5126,0.6264],"LF":[0.262,0.6755],"RF":[0.7821,0.6437]},{"LH":[0.0,0.625],"RH":[0.5039,0.63],"LF":[0.2594,0.6667],"RF":[0.7411,0.6716]},{"LH":[0.0,0.6185],"RH":[0.5353,0.6225],"LF":[0.2862,0.6642],"RF":[0.7621,0.6716]},{"LH":[0.0,0.6171],"RH":[0.5323,0.6264],"LF":[0.2514,0.6728],"RF":[0.7431,0.6604]},{"LH":[0.0,0.6023],"RH":[0.4993,0.6136],"LF":[0.267,0.6628],"RF":[0.7586,0.6409]},{"LH":[0.0,0.6139],"RH":[0.5284,0.6039],"LF":[0.2544,0.6758],"RF":[0.775,0.6351]},{"LH":[0.0,0.6154],"RH":[0.5112,0.6166],"LF":[0.2476,0.6506],"RF":[0.7708,0.6218]},{"LH":[0.0,0.6016],"RH":[0.4678,0.616],"LF":[0.2456,0.6628],"RF":[0.768,0.6255]},{"LH":[0.0,0.6073],"RH":[0.486,0.6171],"LF":[0.243,0.687],"RF":[0.7556,0.6364]},{"LH":[0.0,0.6257],"RH":[0.5223,0.6236],"LF":[0.2555,0.6868],"RF":[0.7816,0.6567]},{"LH":[0.0,0.6207],"RH":[0.5005,0.6248],"LF":[0.2541,0.6679],"RF":[0.7739,0.6392]},{"LH":[0.0,0.6314],"RH":[0.5405,0.6032],"LF":[0.2742,0.6601],"RF":[0.8068,0.616]},{"LH":[0.0,0.6328],"RH":[0.4925,0.6262],"LF":[0.2694,0.6498],"RF":[0.7657,0.6388]},{"LH":[0.0,0.625],"RH":[0.5367,0.6135],"LF":[0.2881,0.6434],"RF":[0.8051,0.6197]}]},"trot":{"strides":[{"LH":[0.0,0.4847],"RH":[0.5233,0.5],"LF":[0.5534,0.5305],"RF":[0.0541,0.5]},{"LH":[0.0,0.4795],"RH":[0.4982,0.4985],"LF":[0.4804,0.5723],"RF":[0.0593,0.5254]},{"LH":[0.0,0.4924],"RH":[0.4981,0.4877],"LF":[0.4981,0.5394],"RF":[0.0121,0.5269]},{"LH":[0.0,0.5062],"RH":[0.5065,0.5015],"LF":[0.5498,0.5109],"RF":[0.0865,0.4828]},{"LH":[0.0,0.5105],"RH":[0.515,0.491],"LF":[0.521,0.5546],"RF":[0.0539,0.5091]},{"LH":[0.0,0.5254],"RH":[0.5285,0.4848],"LF":[0.5224,0.5636],"RF":[0.0425,0.5217]},{"LH":[0.0,0.5192],"RH":[0.5127,0.5046],"LF":[0.5127,0.5826],"RF":[0.994,0.5572]},{"LH":[0.0,0.4601],"RH":[0.4506,0.503],"LF":[0.4627,0.5749],"RF":[0.9878,0.5196]},{"LH":[0.0,0.4773],"RH":[0.4713,0.4788],"LF":[0.4713,0.5617],"RF":[0.0,0.5217]},{"LH":[0.0,0.4777],"RH":[0.5075,0.4522],"LF":[0.4761,0.528],"RF":[0.9687,0.5321]},{"LH":[0.0,0.4768],"RH":[0.5071,0.4543],"LF":[0.5446,0.5188],"RF":[0.0376,0.5031]},{"LH":[0.0,0.4663],"RH":[0.4652,0.4865],"LF":[0.4713,0.5169],"RF":[0.9939,0.4954]},{"LH":[0.0,0.448],"RH":[0.5049,0.4671],"LF":[0.5437,0.48],"RF":[0.0129,0.4889]},{"LH":[0.0,0.4214],"RH":[0.4626,0.4498],"LF":[0.4558,0.5],"RF":[0.966,0.4733]},{"LH":[0.0,0.4042],"RH":[0.4587,0.4583],"LF":[0.4518,0.4861],"RF":[0.007,0.4375]},{"LH":[0.0,0.3836],"RH":[0.4271,0.4816],"LF":[0.4407,0.4865],"RF":[0.9932,0.4505]},{"LH":[0.0,0.4172],"RH":[0.4337,0.459],"LF":[0.4337,0.4832],"RF":[0.98,0.4558]},{"LH":[0.0,0.4354],"RH":[0.5155,0.4112],"LF":[0.4674,0.4746],"RF":[0.9794,0.4653]},{"LH":[0.0,0.4027],"RH":[0.4686,0.4452],"LF":[0.4619,0.4816],"RF":[0.9464,0.4823]},{"LH":[0.0,0.4172],"RH":[0.4249,0.4667],"LF":[0.4519,0.4631],"RF":[0.0135,0.4266]},{"LH":[0.0,0.4415],"RH":[0.4393,0.4747],"LF":[0.4721,0.4752],"RF":[0.9607,0.4834]},{"LH":[0.0,0.4408],"RH":[0.5179,0.4369],"LF":[0.4714,0.4851],"RF":[0.9734,0.4886]},{"LH":[0.0,0.4267],"RH":[0.4537,0.457],"LF":[0.4604,0.4932],"RF":[0.9733,0.4721]},{"LH":[0.0,0.4437],"RH":[0.4796,0.443],"LF":[0.4063,0.5407],"RF":[0.0067,0.4626]},{"LH":[0.0,0.4437],"RH":[0.4718,0.429],"LF":[0.4448,0.5084],"RF":[0.9663,0.4784]},{"LH":[0.0,0.4873],"RH":[0.5843,0.4096],"LF":[0.5245,0.4867],"RF":[0.0664,0.4527]},{"LH":[0.0,0.3945],"RH":[0.4433,0.4542],"LF":[0.45,0.5066],"RF":[0.9597,0.4752]},{"LH":[0.0,0.4262],"RH":[0.4434,0.466],"LF":[0.4632,0.4983],"RF":[0.9934,0.4631]},{"LH":[0.0,0.4416],"RH":[0.474,0.4487],"LF":[0.4545,0.4951],"RF":[0.987,0.4721]},{"LH":[0.0,0.4356],"RH":[0.4975,0.4248],"LF":[0.4582,0.4935],"RF":[0.9738,0.4787]}]}}};
+const REAL_DATA = ALL_DATA.phase;
+const FOOTFALL_DATA = ALL_DATA.footfall;
+
+// Top-view horse image (base64 JPEG, head at BOTTOM of image, tail at TOP)
+const HORSE_IMG_B64 = "/9j/4AAQSkZJRgABAQEBLAEsAAD/4QB4RXhpZgAASUkqAAgAAAADAA4BAgAuAAAAMgAAABoBBQABAAAAYAAAABsBBQABAAAAaAAAAAAAAABJbGx1c3RyYXRpb24gb2YgYSBob3JzZSBmcm9tIGFib3ZlIHBlcnNwZWN0aXZlLAEAAAEAAAAsAQAAAQAAAP/hBaNodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+Cjx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iPgoJPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4KCQk8cmRmOkRlc2NyaXB0aW9uIHJkZjphYm91dD0iIiB4bWxuczpwaG90b3Nob3A9Imh0dHA6Ly9ucy5hZG9iZS5jb20vcGhvdG9zaG9wLzEuMC8iIHhtbG5zOklwdGM0eG1wQ29yZT0iaHR0cDovL2lwdGMub3JnL3N0ZC9JcHRjNHhtcENvcmUvMS4wL3htbG5zLyIgICB4bWxuczpHZXR0eUltYWdlc0dJRlQ9Imh0dHA6Ly94bXAuZ2V0dHlpbWFnZXMuY29tL2dpZnQvMS4wLyIgeG1sbnM6ZGM9Imh0dHA6Ly9wdXJsLm9yZy9kYy9lbGVtZW50cy8xLjEvIiB4bWxuczpwbHVzPSJodHRwOi8vbnMudXNlcGx1cy5vcmcvbGRmL3htcC8xLjAvIiAgeG1sbnM6aXB0Y0V4dD0iaHR0cDovL2lwdGMub3JnL3N0ZC9JcHRjNHhtcEV4dC8yMDA4LTAyLTI5LyIgeG1sbnM6eG1wUmlnaHRzPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvcmlnaHRzLyIgcGhvdG9zaG9wOkNyZWRpdD0iR2V0dHkgSW1hZ2VzIiBHZXR0eUltYWdlc0dJRlQ6QXNzZXRJRD0iMjIwNTE3NTcxOCIgeG1wUmlnaHRzOldlYlN0YXRlbWVudD0iaHR0cHM6Ly93d3cuaXN0b2NrcGhvdG8uY29tL2xlZ2FsL2xpY2Vuc2UtYWdyZWVtZW50P3V0bV9tZWRpdW09b3JnYW5pYyZhbXA7dXRtX3NvdXJjZT1nb29nbGUmYW1wO3V0bV9jYW1wYWlnbj1pcHRjdXJsIiBwbHVzOkRhdGFNaW5pbmc9Imh0dHA6Ly9ucy51c2VwbHVzLm9yZy9sZGYvdm9jYWIvRE1JLVBST0hJQklURUQtRVhDRVBUU0VBUkNIRU5HSU5FSU5ERVhJTkciID4KPGRjOmNyZWF0b3I+PHJkZjpTZXE+PHJkZjpsaT5ibHVlcmluZ21lZGlhPC9yZGY6bGk+PC9yZGY6U2VxPjwvZGM6Y3JlYXRvcj48ZGM6ZGVzY3JpcHRpb24+PHJkZjpBbHQ+PHJkZjpsaSB4bWw6bGFuZz0ieC1kZWZhdWx0Ij5JbGx1c3RyYXRpb24gb2YgYSBob3JzZSBmcm9tIGFib3ZlIHBlcnNwZWN0aXZlPC9yZGY6bGk+PC9yZGY6QWx0PjwvZGM6ZGVzY3JpcHRpb24+CjxwbHVzOkxpY2Vuc29yPjxyZGY6U2VxPjxyZGY6bGkgcmRmOnBhcnNlVHlwZT0nUmVzb3VyY2UnPjxwbHVzOkxpY2Vuc29yVVJMPmh0dHBzOi8vd3d3LmlzdG9ja3Bob3RvLmNvbS9waG90by9saWNlbnNlLWdtMjIwNTE3NTcxOC0/dXRtX21lZGl1bT1vcmdhbmljJmFtcDt1dG1fc291cmNlPWdvb2dsZSZhbXA7dXRtX2NhbXBhaWduPWlwdGN1cmw8L3BsdXM6TGljZW5zb3JVUkw+PC9yZGY6bGk+PC9yZGY6U2VxPjwvcGx1czpMaWNlbnNvcj4KCQk8L3JkZjpEZXNjcmlwdGlvbj4KCTwvcmRmOlJERj4KPC94OnhtcG1ldGE+Cjw/eHBhY2tldCBlbmQ9InciPz4K/+0AelBob3Rvc2hvcCAzLjAAOEJJTQQEAAAAAABeHAFaAAMbJUccAlAADWJsdWVyaW5nbWVkaWEcAngALklsbHVzdHJhdGlvbiBvZiBhIGhvcnNlIGZyb20gYWJvdmUgcGVyc3BlY3RpdmUcAm4ADEdldHR5IEltYWdlc//bAEMACgcHCAcGCggICAsKCgsOGBAODQ0OHRUWERgjHyUkIh8iISYrNy8mKTQpISIwQTE0OTs+Pj4lLkRJQzxINz0+O//bAEMBCgsLDg0OHBAQHDsoIig7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";
+const horseImg = new Image();
+let horseImgLoaded = false;
+let horseRotated = null; // offscreen canvas with horse pre-rotated to head-right (landscape)
+horseImg.onload = () => {
+  // Original image: tail at top, head at bottom (portrait, ~184 x 612)
+  // Rotate 90° CCW so head points right (landscape, ~612 x 184)
+  const oc = document.createElement("canvas");
+  oc.width = horseImg.naturalHeight;  // 612
+  oc.height = horseImg.naturalWidth;  // 184
+  const octx = oc.getContext("2d");
+  octx.translate(oc.width / 2, oc.height / 2);
+  octx.rotate(-Math.PI / 2);
+  octx.drawImage(horseImg, -horseImg.naturalWidth / 2, -horseImg.naturalHeight / 2);
+  horseRotated = oc;
+  horseImgLoaded = true;
+};
+horseImg.src = "data:image/jpeg;base64," + HORSE_IMG_B64;
+
+// ============================================================
+// Gait presets: target phases [LH, RH, LF, RF]
+// ============================================================
+// "duty" = fraction of each stride a hoof is on the ground.
+// Walk/trot numbers match the real EquiPro data (0.63, 0.47).
+// Gallop is short enough that all four feet leave the ground → suspension.
+const GAITS = {
+  walk:   { phases: [0.00, 0.50, 0.25, 0.75], duty: 0.62, desc: "Walk: 4-beat gait. Feet hit the ground in sequence: LH → LF → RH → RF." },
+  trot:   { phases: [0.00, 0.50, 0.50, 0.00], duty: 0.47, desc: "Trot: 2-beat diagonal gait. LH+RF move together, then RH+LF." },
+  pace:   { phases: [0.00, 0.50, 0.00, 0.50], duty: 0.45, desc: "Pace: 2-beat lateral gait. LH+LF move together, then RH+RF." },
+  bound:  { phases: [0.00, 0.00, 0.50, 0.50], duty: 0.42, desc: "Bound: LF+RF move together, then LH+RH." },
+  gallop: { phases: [0.00, 0.10, 0.60, 0.70], duty: 0.30, desc: "Gallop: 4-beat asymmetric gait with a suspension phase. Right lead: LH → RH → LF → RF → Suspension. Left lead is the mirror." },
+};
+
+const LIMB_NAMES = ["LH", "RH", "LF", "RF"];
+const LIMB_COLORS = {
+  LH: "#2e7d32", RH: "#ef6c00", LF: "#1565c0", RF: "#c62828"
+};
+
+// ============================================================
+// ODE state: 4 coupled phase oscillators (Kuramoto-style)
+// dθ_i/dt = ω + (K/3) Σ sin((θ_j - θ_i) - (φ*_j - φ*_i))
+// ============================================================
+let theta = [0, 0.5*2*Math.PI, 0.25*2*Math.PI, 0.75*2*Math.PI];
+let targetPhases = [...GAITS.walk.phases];
+let K = 6.0;
+let omegaMult = 1.0;
+const BASE_OMEGA = 2 * Math.PI * 1.2; // 1.2 Hz baseline
+let currentGait = "walk";
+let currentDataGait = "walk";
+
+function stepODE(dt) {
+  const phiStar = targetPhases.map(p => p * 2 * Math.PI);
+  const omega = BASE_OMEGA * omegaMult;
+  const N = 4;
+  const dTheta = new Array(N).fill(0);
+  for (let i = 0; i < N; i++) {
+    let coupling = 0;
+    for (let j = 0; j < N; j++) {
+      if (i === j) continue;
+      const diff = (theta[j] - theta[i]) - (phiStar[j] - phiStar[i]);
+      coupling += Math.sin(diff);
+    }
+    dTheta[i] = omega + (K / (N - 1)) * coupling;
+  }
+  for (let i = 0; i < N; i++) {
+    theta[i] = (theta[i] + dt * dTheta[i]) % (2 * Math.PI);
+    if (theta[i] < 0) theta[i] += 2 * Math.PI;
+  }
+}
+
+// ============================================================
+// Canvas setup with DPI scaling
+// ============================================================
+function setupCanvas(canvas) {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(dpr, dpr);
+  return { ctx, w: rect.width, h: rect.height };
+}
+
+// ============================================================
+// Horse drawing (top view, head-right landscape orientation)
+// Uses pre-rotated offscreen canvas
+// ============================================================
+function drawHorse() {
+  const canvas = document.getElementById("horseCanvas");
+  const { ctx, w, h } = setupCanvas(canvas);
+  ctx.clearRect(0, 0, w, h);
+
+  ctx.fillStyle = "#f0ead8";
+  ctx.fillRect(0, 0, w, h);
+
+  if (!horseImgLoaded || !horseRotated) {
+    ctx.fillStyle = "#999";
+    ctx.font = "14px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("Loading horse…", w/2, h/2);
+    return;
+  }
+
+  // Landscape aspect: width / height
+  const imgAR = horseRotated.width / horseRotated.height; // ~3.33
+  const maxBodyW = w * 0.72;
+  const maxBodyH = h * 0.48;
+  let bodyW = maxBodyW;
+  let bodyH = bodyW / imgAR;
+  if (bodyH > maxBodyH) { bodyH = maxBodyH; bodyW = bodyH * imgAR; }
+
+  const cx = w / 2;
+  const cy = h / 2;
+  const imgX = cx - bodyW / 2;
+  const imgY = cy - bodyH / 2;
+
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,0.25)";
+  ctx.shadowBlur = 10;
+  ctx.shadowOffsetX = 2;
+  ctx.shadowOffsetY = 3;
+  ctx.drawImage(horseRotated, imgX, imgY, bodyW, bodyH);
+  ctx.restore();
+
+  // Head-right orientation: hinds on the LEFT, fronts on the RIGHT.
+  // Looking down at the horse's back with head right: horse's left side = viewer's TOP (north).
+  const hoofDxHind  = bodyW * 0.32;
+  const hoofDxFront = bodyW * 0.32;
+  // Pull hoofs in enough that circles + labels stay inside the canvas
+  const maxHoofR = 14, labelPad = 20;
+  const maxHoofDy = (h / 2) - maxHoofR - labelPad - 4;
+  const hoofDy = Math.min(bodyH * 0.78, maxHoofDy);
+  const hoofPositions = {
+    LH: { x: cx - hoofDxHind,  y: cy - hoofDy, side: "top"    },
+    RH: { x: cx - hoofDxHind,  y: cy + hoofDy, side: "bottom" },
+    LF: { x: cx + hoofDxFront, y: cy - hoofDy, side: "top"    },
+    RF: { x: cx + hoofDxFront, y: cy + hoofDy, side: "bottom" },
+  };
+
+  const duty = currentDuty();
+  LIMB_NAMES.forEach((limb, i) => {
+    const pos = hoofPositions[limb];
+    const phase = (theta[i] / (2 * Math.PI)) % 1.0;
+    const inStance = phase < duty;
+
+    // Leg line from body edge down (or up) to hoof
+    const bodyEdgeY = cy + (pos.side === "bottom" ? bodyH * 0.42 : -bodyH * 0.42);
+    ctx.strokeStyle = "#3e2723";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(pos.x, bodyEdgeY);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.stroke();
+
+    // Hoof circle
+    const r = inStance ? 14 : 9;
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, r, 0, 2*Math.PI);
+    ctx.fillStyle = inStance ? LIMB_COLORS[limb] : "rgba(220,220,220,0.55)";
+    ctx.fill();
+    ctx.strokeStyle = LIMB_COLORS[limb];
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // Label outside the hoof
+    ctx.fillStyle = "#222";
+    ctx.font = "bold 12px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = pos.side === "top" ? "bottom" : "top";
+    const labelY = pos.y + (pos.side === "top" ? -18 : 18);
+    ctx.fillText(limb, pos.x, labelY);
+  });
+}
+
+// ============================================================
+// Phase circle: 4 oscillators on unit circle
+// ============================================================
+function drawPhaseCircle() {
+  const canvas = document.getElementById("phaseCanvas");
+  const { ctx, w, h } = setupCanvas(canvas);
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = "#fafafa";
+  ctx.fillRect(0, 0, w, h);
+
+  const cx = w / 2, cy = h / 2;
+  const R = Math.min(w, h) * 0.38;
+
+  // Circle
+  ctx.strokeStyle = "#ccc";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, 0, 2*Math.PI);
+  ctx.stroke();
+
+  // Phase marks at target phases (dashed)
+  LIMB_NAMES.forEach((limb, i) => {
+    const a = targetPhases[i] * 2 * Math.PI - Math.PI/2;
+    ctx.strokeStyle = LIMB_COLORS[limb];
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(a)*R, cy + Math.sin(a)*R);
+    ctx.stroke();
+  });
+  ctx.setLineDash([]);
+
+  // Current oscillator positions
+  LIMB_NAMES.forEach((limb, i) => {
+    const a = theta[i] - Math.PI/2;
+    const x = cx + Math.cos(a) * R;
+    const y = cy + Math.sin(a) * R;
+    ctx.beginPath();
+    ctx.arc(x, y, 9, 0, 2*Math.PI);
+    ctx.fillStyle = LIMB_COLORS[limb];
+    ctx.fill();
+    ctx.strokeStyle = "white";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  });
+
+  // Equation text
+  ctx.fillStyle = "#666";
+  ctx.font = "11px ui-monospace, monospace";
+  ctx.textAlign = "left";
+  ctx.fillText("dθᵢ/dt = ω + (K/3) Σ sin((θⱼ−θᵢ) − (φⱼ*−φᵢ*))", 8, h - 8);
+}
+
+// ============================================================
+// Live footfall pattern — scrolls in sync with the simulation
+// Stance bars come from actual stance history recorded each frame,
+// so transitions between gaits are visible (not a pop).
+// ============================================================
+let simPhase = 0; // continuous elapsed strides (monotonic)
+function currentDuty() { return GAITS[currentGait].duty; }
+
+// Per-limb history of completed stance intervals [{start, end}, ...]
+const stanceEvents = [[], [], [], []];
+// Per-limb: timestamp when the current stance began, or null if airborne
+const stanceActive = [null, null, null, null];
+
+function updateStanceHistory() {
+  const duty = currentDuty();
+  for (let i = 0; i < 4; i++) {
+    const p = ((theta[i] / (2 * Math.PI)) % 1 + 1) % 1;
+    const inStance = p < duty;
+    if (inStance && stanceActive[i] === null) {
+      stanceActive[i] = simPhase;
+    } else if (!inStance && stanceActive[i] !== null) {
+      stanceEvents[i].push({ start: stanceActive[i], end: simPhase });
+      stanceActive[i] = null;
+    }
+  }
+  // Prune events older than what can ever be visible
+  const cutoff = simPhase - 5;
+  for (let i = 0; i < 4; i++) {
+    while (stanceEvents[i].length > 0 && stanceEvents[i][0].end < cutoff) {
+      stanceEvents[i].shift();
+    }
+  }
+}
+
+function drawFootfall() {
+  const canvas = document.getElementById("footfallCanvas");
+  const { ctx, w, h } = setupCanvas(canvas);
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = "#fafafa";
+  ctx.fillRect(0, 0, w, h);
+
+  const padL = 36, padR = 10, padT = 10, padB = 14;
+  const plotW = w - padL - padR;
+  const plotH = h - padT - padB;
+
+  // 4 rows, narrow bars, close together
+  const rowH = plotH / 4;
+  const barH = Math.max(5, rowH * 0.38);
+
+  // Row labels
+  LIMB_NAMES.forEach((limb, r) => {
+    const y = padT + r * rowH + rowH / 2;
+    ctx.fillStyle = LIMB_COLORS[limb];
+    ctx.font = "bold 11px sans-serif";
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    ctx.fillText(limb, padL - 5, y);
+  });
+
+  // Outer box
+  ctx.strokeStyle = "#ddd";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(padL, padT, plotW, plotH);
+
+  // Show N strides worth across the view; playhead near the right edge
+  // so most of the view is recorded past, a small gap on the right is "future".
+  const N_STRIDES_VISIBLE = 3;
+  const strideW = plotW / N_STRIDES_VISIBLE;
+  const playheadFrac = 0.88;
+  const playheadX = padL + plotW * playheadFrac;
+
+  // Map time t (in stride units) to x
+  function tToX(t) { return playheadX + (t - simPhase) * strideW; }
+
+  // Clip to plot area
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(padL, padT, plotW, plotH);
+  ctx.clip();
+
+  LIMB_NAMES.forEach((limb, r) => {
+    const y = padT + r * rowH + rowH / 2;
+    ctx.fillStyle = LIMB_COLORS[limb];
+
+    // Completed stance intervals
+    const events = stanceEvents[r];
+    for (let k = 0; k < events.length; k++) {
+      const ev = events[k];
+      const x1 = tToX(ev.start);
+      const x2 = tToX(ev.end);
+      if (x2 < padL || x1 > playheadX + 2) continue;
+      ctx.fillRect(x1, y - barH / 2, x2 - x1, barH);
+    }
+    // Currently-active stance, drawn up to "now"
+    if (stanceActive[r] !== null) {
+      const x1 = tToX(stanceActive[r]);
+      const x2 = playheadX;
+      if (x2 > x1) ctx.fillRect(x1, y - barH / 2, x2 - x1, barH);
+    }
+  });
+
+  ctx.restore();
+
+  // Playhead
+  ctx.strokeStyle = "#222";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(playheadX, padT - 2);
+  ctx.lineTo(playheadX, padT + plotH + 2);
+  ctx.stroke();
+
+  // Tiny "now" label above the playhead
+  ctx.fillStyle = "#222";
+  ctx.font = "9px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "bottom";
+  ctx.fillText("now", playheadX, padT - 2);
+}
+
+// ============================================================
+// Real data raster
+// ============================================================
+function drawRealData() {
+  const canvas = document.getElementById("dataCanvas");
+  const { ctx, w, h } = setupCanvas(canvas);
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = "#fafafa";
+  ctx.fillRect(0, 0, w, h);
+
+  const data = REAL_DATA[currentDataGait];
+  const ideal = GAITS[currentDataGait].phases;
+  const padL = 40, padR = 16, padT = 16, padB = 28;
+  const plotW = w - padL - padR;
+  const plotH = h - padT - padB;
+  const n = data.LH.length;
+
+  // Axes
+  ctx.strokeStyle = "#ccc";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(padL, padT, plotW, plotH);
+
+  // Ideal phase lines
+  LIMB_NAMES.forEach((limb, i) => {
+    const x = padL + ideal[i] * plotW;
+    ctx.strokeStyle = LIMB_COLORS[limb];
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    ctx.moveTo(x, padT);
+    ctx.lineTo(x, padT + plotH);
+    ctx.stroke();
+  });
+  ctx.setLineDash([]);
+
+  // Data dots
+  LIMB_NAMES.forEach((limb) => {
+    ctx.fillStyle = LIMB_COLORS[limb];
+    for (let k = 0; k < n; k++) {
+      const p = data[limb][k];
+      const y = padT + (k / n) * plotH;
+      ctx.beginPath();
+      ctx.arc(padL + p * plotW, y, 2, 0, 2*Math.PI);
+      ctx.fill();
+    }
+  });
+
+  // X labels
+  ctx.fillStyle = "#666";
+  ctx.font = "10px sans-serif";
+  ctx.textAlign = "center";
+  [0, 0.25, 0.5, 0.75, 1].forEach(t => {
+    ctx.fillText(t.toFixed(2), padL + t * plotW, padT + plotH + 14);
+  });
+  ctx.fillText("Normalized stride phase", padL + plotW/2, padT + plotH + 24);
+
+  // Y label
+  ctx.save();
+  ctx.translate(12, padT + plotH/2);
+  ctx.rotate(-Math.PI/2);
+  ctx.fillText("Stride #", 0, 0);
+  ctx.restore();
+}
+
+// ============================================================
+// Event handlers
+// ============================================================
+function selectGait(name) {
+  currentGait = name;
+  targetPhases = [...GAITS[name].phases];
+  document.querySelectorAll("#gaitButtons button").forEach(b => {
+    b.classList.toggle("active", b.dataset.gait === name);
+  });
+  document.getElementById("gaitDescription").textContent = GAITS[name].desc;
+  document.getElementById("rhSlider").value = targetPhases[1];
+  document.getElementById("lfSlider").value = targetPhases[2];
+  document.getElementById("rfSlider").value = targetPhases[3];
+  document.getElementById("rhVal").textContent = targetPhases[1].toFixed(2);
+  document.getElementById("lfVal").textContent = targetPhases[2].toFixed(2);
+  document.getElementById("rfVal").textContent = targetPhases[3].toFixed(2);
+}
+
+document.querySelectorAll("#gaitButtons button").forEach(btn => {
+  btn.addEventListener("click", () => selectGait(btn.dataset.gait));
+});
+
+document.getElementById("kSlider").addEventListener("input", e => {
+  K = parseFloat(e.target.value);
+  document.getElementById("kVal").textContent = K.toFixed(1);
+});
+document.getElementById("wSlider").addEventListener("input", e => {
+  omegaMult = parseFloat(e.target.value);
+  document.getElementById("wVal").textContent = omegaMult.toFixed(2) + "\u00d7";
+});
+
+["rh", "lf", "rf"].forEach((limb, idx) => {
+  const i = idx + 1;
+  document.getElementById(limb + "Slider").addEventListener("input", e => {
+    targetPhases[i] = parseFloat(e.target.value);
+    document.getElementById(limb + "Val").textContent = targetPhases[i].toFixed(2);
+  });
+});
+
+document.getElementById("customBtn").addEventListener("click", () => {
+  const panel = document.getElementById("customPhases");
+  const btn = document.getElementById("customBtn");
+  if (panel.style.display === "none") {
+    panel.style.display = "block";
+    btn.textContent = "Hide custom phase sliders \u25b2";
+  } else {
+    panel.style.display = "none";
+    btn.textContent = "Show custom phase sliders \u25bc";
+  }
+});
+
+document.querySelectorAll(".dataTab").forEach(btn => {
+  btn.addEventListener("click", () => {
+    currentDataGait = btn.dataset.data;
+    document.querySelectorAll(".dataTab").forEach(b => b.classList.toggle("active", b === btn));
+    const info = currentDataGait === "walk"
+      ? "80 strides from a real horse walking. Each dot = one hoof hitting the ground. Dashed lines = ideal walk."
+      : "80 strides from a real horse trotting. Notice LH+RF overlap and RH+LF overlap \u2014 diagonal pairs!";
+    document.getElementById("dataInfo").textContent = info;
+    drawRealData();
+  });
+});
+
+// ============================================================
+// Main animation loop
+// ============================================================
+let lastTime = performance.now();
+function loop(t) {
+  const dt = Math.min(0.05, (t - lastTime) / 1000);
+  lastTime = t;
+  const substeps = 4;
+  for (let s = 0; s < substeps; s++) stepODE(dt / substeps);
+
+  // Advance the footfall playhead at the current stride rate
+  const omegaNow = BASE_OMEGA * omegaMult;
+  simPhase += dt * (omegaNow / (2 * Math.PI));
+
+  // Record actual stance events from the live oscillator state
+  updateStanceHistory();
+
+  drawHorse();
+  drawFootfall();
+  drawPhaseCircle();
+  requestAnimationFrame(loop);
+}
+
+// ============================================================
+// Initial setup
+// ============================================================
+selectGait("walk");
+drawRealData();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
