@@ -294,7 +294,7 @@ const GAITS = {
   trot:   { phases: [0.00, 0.50, 0.50, 0.00], duty: 0.47, desc: "Trot: 2-beat diagonal gait. LH+RF move together, then RH+LF." },
   pace:   { phases: [0.00, 0.50, 0.00, 0.50], duty: 0.45, desc: "Pace: 2-beat lateral gait. LH+LF move together, then RH+RF." },
   bound:  { phases: [0.00, 0.00, 0.50, 0.50], duty: 0.42, desc: "Bound: LF+RF move together, then LH+RH." },
-  gallop: { phases: [0.00, 0.10, 0.60, 0.70], duty: 0.30, desc: "Gallop: 4-beat asymmetric gait with a suspension phase. Right lead: LH → RH → LF → RF → Suspension. Left lead is the mirror." },
+  gallop: { phases: [0.00, 0.15, 0.45, 0.60], duty: 0.25, desc: "Gallop: 4-beat asymmetric gait with a suspension phase at the end of each stride. Right lead: LH → RH → LF → RF → Suspension. Left lead is the mirror." },
 };
 
 const LIMB_NAMES = ["LH", "RH", "LF", "RF"];
