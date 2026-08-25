@@ -2,8 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Horse Gait Lab</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EquiPhysics Horse Gait Lab</title>
+<meta name="description" content="Interactive coupled-oscillator model of horse gaits — walk, trot, canter, gallop — built on real horse data. An EquiPhysics learning app.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐴</text></svg>">
 <style>
   :root {
     --LH: #2e7d32;
@@ -15,7 +17,8 @@
     --text: #222;
     --muted: #666;
     --border: #e3e0da;
-    --accent: #6a1b9a;
+    --accent: #1c2757;   /* EquiPhysics indigo */
+    --accent2: #5b7db1;  /* EquiPhysics wave blue */
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
@@ -34,6 +37,15 @@
   }
   header h1 { margin: 0; font-size: 18px; font-weight: 600; }
   header p { margin: 2px 0 0; font-size: 12px; opacity: 0.85; }
+  header .logo {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    display: block;
+    margin: 0 auto 6px;
+    border: 2px solid rgba(169, 189, 217, 0.6);
+    background: #fff;
+  }
   main {
     max-width: 600px;
     margin: 0 auto;
@@ -75,6 +87,51 @@
     background: var(--accent);
     color: white;
     border-color: var(--accent);
+  }
+  .sound-btn {
+    width: 100%;
+    margin-top: 8px;
+    padding: 10px;
+    border: 1px solid var(--border);
+    background: #f7f5f0;
+    color: var(--text);
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .sound-btn.on {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+  .btn-row {
+    display: flex;
+    gap: 6px;
+  }
+  .btn-row .sound-btn { flex: 1; width: auto; }
+  .sync-meter { margin: 10px 0 4px; }
+  .sync-meter .sync-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .sync-meter .val { font-family: ui-monospace, Menlo, monospace; }
+  .sync-meter .sync-track {
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .sync-meter .sync-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--accent2);
+    border-radius: 3px;
+    transition: width 0.12s linear;
   }
   .slider-row {
     margin: 10px 0;
@@ -128,6 +185,14 @@
   .legend .rh { color: var(--RH); }
   .legend .lf { color: var(--LF); }
   .legend .rf { color: var(--RF); }
+  .equation {
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 13.5px;
+    color: var(--muted);
+    text-align: center;
+    margin: 10px 0 2px;
+    overflow-x: auto;
+  }
   .tab-row {
     display: flex;
     gap: 4px;
@@ -158,12 +223,14 @@
     font-size: 11px;
     color: var(--muted);
   }
+  footer a { color: var(--accent2); }
 </style>
 </head>
 <body>
 <header>
-  <h1>🐴 Horse Gait Lab</h1>
-  <p>Sonia Kovalevsky Day · Math Modeling with ODEs</p>
+  <img id="eqLogo" class="logo" alt="EquiPhysics logo">
+  <h1>Horse Gait Lab</h1>
+  <p>An EquiPhysics learning app · <a href="https://equiphysics.org" style="color:#a9bdd9">equiphysics.org</a></p>
 </header>
 
 <main>
@@ -175,7 +242,7 @@
       <button data-gait="walk">Walk</button>
       <button data-gait="trot">Trot</button>
       <button data-gait="pace">Pace</button>
-      <button data-gait="bound">Bound</button>
+      <button data-gait="canter">Canter</button>
       <button data-gait="gallop">Gallop</button>
     </div>
     <p class="info-text" id="gaitDescription">Walk: 4-beat gait. Feet hit the ground in sequence: LH → LF → RH → RF.</p>
@@ -186,6 +253,7 @@
     <h2>2. Watch the Horse</h2>
     <canvas id="horseCanvas" width="560" height="260"></canvas>
     <p class="info-text">Top view. Hooves light up when touching the ground. When you switch gaits, the horse takes a moment to transition — how fast depends on the coupling strength K in section 4 (higher K = faster lock-in).</p>
+    <button id="soundBtn" class="sound-btn">🔇 Hoofbeats: off — tap to listen</button>
   </div>
 
   <!-- Live footfall pattern, synced to the simulation -->
@@ -198,31 +266,41 @@
   <!-- Phase circle + controls -->
   <div class="card">
     <h2>4. The Math Behind It</h2>
-    <canvas id="phaseCanvas" width="560" height="220"></canvas>
+    <canvas id="phaseCanvas" width="560" height="260"></canvas>
     <div class="legend">
       <span class="lh">LH</span>
       <span class="rh">RH</span>
       <span class="lf">LF</span>
       <span class="rf">RF</span>
     </div>
-    <p class="info-text">Each leg is a spinning clock. Coupling pulls them into a stable pattern.</p>
+    <p class="equation">dθᵢ/dt = ω + (K/3) Σⱼ≠ᵢ sin((θⱼ−θᵢ) − (φⱼ*−φᵢ*))</p>
+    <p class="info-text">Each leg is a hand on its own clock ring — all four spin at the same rate. A solid dot in the shaded slice means that hoof is on the ground; a hollow dot is in the air. Coupling pulls the four clocks into a stable pattern.</p>
+
+    <div class="sync-meter">
+      <div class="sync-label"><span>In sync</span><span class="val" id="syncVal">—</span></div>
+      <div class="sync-track"><div class="sync-fill" id="syncFill"></div></div>
+    </div>
 
     <div class="slider-row">
       <label><span>Coupling strength K</span><span class="val" id="kVal">6.0</span></label>
       <input type="range" id="kSlider" min="0" max="15" step="0.1" value="6.0">
     </div>
+    <div class="btn-row">
+      <button id="scatterBtn" class="sound-btn">🎲 Scatter the legs</button>
+      <button id="slowBtn" class="sound-btn">🐢 Slow motion</button>
+    </div>
     <div class="slider-row">
-      <label><span>Speed ω</span><span class="val" id="wVal">1.0×</span></label>
+      <label><span>Speed ω</span><span class="val" id="wVal">1.0× · 72 strides/min</span></label>
       <input type="range" id="wSlider" min="0.2" max="3" step="0.05" value="1.0">
     </div>
     <div class="slider-row">
-      <label><span>Duty factor (fraction on ground)</span><span class="val" id="dVal">0.62</span></label>
-      <input type="range" id="dSlider" min="0.10" max="0.90" step="0.01" value="0.62">
+      <label><span>Duty factor (fraction on ground)</span><span class="val" id="dVal">0.48</span></label>
+      <input type="range" id="dSlider" min="0.10" max="0.90" step="0.01" value="0.48">
     </div>
     <p class="info-text" style="margin-top:-4px;">Lower duty = more time airborne. Try a low duty with trot or pace to see suspension.</p>
 
-    <div id="customPhases" style="display:none;">
-      <p class="info-text" style="margin-top:10px;">Target phase offsets (fraction of stride):</p>
+    <div id="customPhases">
+      <p class="info-text" style="margin-top:10px;">Target phase offsets (fraction of stride) — drag to invent your own gait:</p>
       <div class="slider-row">
         <label><span style="color:var(--RH)">RH offset</span><span class="val" id="rhVal">0.50</span></label>
         <input type="range" id="rhSlider" class="phase-slider" style="--thumb:var(--RH)" min="0" max="1" step="0.01" value="0.5">
@@ -236,9 +314,6 @@
         <input type="range" id="rfSlider" class="phase-slider" style="--thumb:var(--RF)" min="0" max="1" step="0.01" value="0.75">
       </div>
     </div>
-    <button id="customBtn" style="width:100%; margin-top:8px; padding:8px; background:#f7f5f0; border:1px solid var(--border); border-radius:6px; font-size:12px; cursor:pointer;">
-      Show custom phase sliders ▼
-    </button>
   </div>
 
   <!-- Real data comparison -->
@@ -253,9 +328,18 @@
   </div>
 
 </main>
-<footer>Built for Sonia Kovalevsky Day · Real data from an EquiPro session</footer>
+<footer>Built by <a href="https://equiphysics.org">EquiPhysics</a> · First run by Tucson High School students, 2026 · Real data from an EquiPro session</footer>
 
 <script>
+// ============================================================
+// EquiPhysics logo (embedded webp, 160x160)
+// ============================================================
+const EQ_LOGO_B64 = "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";
+(function () {
+  const img = document.getElementById("eqLogo");
+  if (img) img.src = "data:image/webp;base64," + EQ_LOGO_B64;
+})();
+
 // ============================================================
 // Real horse data (embedded, subsampled from Duque-results.csv)
 // ============================================================
@@ -287,13 +371,15 @@ horseImg.src = "data:image/jpeg;base64," + HORSE_IMG_B64;
 // Gait presets: target phases [LH, RH, LF, RF]
 // ============================================================
 // "duty" = fraction of each stride a hoof is on the ground.
-// Walk/trot numbers match the real EquiPro data (0.63, 0.47).
+// Trot matches the real EquiPro data (0.47). A real walk measures ~0.63,
+// but the walk default is set just under 0.5 so the clock starts airier —
+// students can slide duty up to the measured value themselves.
 // Gallop is short enough that all four feet leave the ground → suspension.
 const GAITS = {
-  walk:   { phases: [0.00, 0.50, 0.25, 0.75], duty: 0.62, desc: "Walk: 4-beat gait. Feet hit the ground in sequence: LH → LF → RH → RF." },
+  walk:   { phases: [0.00, 0.50, 0.25, 0.75], duty: 0.48, desc: "Walk: 4-beat gait. Feet hit the ground in sequence: LH → LF → RH → RF." },
   trot:   { phases: [0.00, 0.50, 0.50, 0.00], duty: 0.47, desc: "Trot: 2-beat diagonal gait. LH+RF move together, then RH+LF." },
   pace:   { phases: [0.00, 0.50, 0.00, 0.50], duty: 0.45, desc: "Pace: 2-beat lateral gait. LH+LF move together, then RH+RF." },
-  bound:  { phases: [0.00, 0.00, 0.50, 0.50], duty: 0.42, desc: "Bound: LF+RF move together, then LH+RH." },
+  canter: { phases: [0.00, 0.30, 0.30, 0.60], duty: 0.35, desc: "Canter: 3-beat gait (right lead). LH → RH+LF together → RF, then a moment of suspension." },
   gallop: { phases: [0.00, 0.10, 0.45, 0.55], duty: 0.25, desc: "Gallop: 4-beat asymmetric gait. Right lead: LH → RH → (gathered suspension) → LF → RF → (extension suspension). The gathered moment is small; the extension suspension is the big airborne one." },
 };
 
@@ -306,7 +392,11 @@ const LIMB_COLORS = {
 // ODE state: 4 coupled phase oscillators (Kuramoto-style)
 // dθ_i/dt = ω + (K/3) Σ_{j=1..4, j≠i} sin((θ_j - θ_i) - (φ*_j - φ*_i))
 // ============================================================
-let theta = [0, 0.5*2*Math.PI, 0.25*2*Math.PI, 0.75*2*Math.PI];
+// Oscillator offsets are the NEGATIVE of footfall phase: a limb touches down
+// when its phase wraps past 0, so a hoof that lands at stride fraction p needs
+// oscillator offset -p. (Without the sign flip the animation plays gaits in
+// mirrored order — e.g. the walk sequence came out LH → RF → RH → LF.)
+let theta = [0, -0.5*2*Math.PI, -0.25*2*Math.PI, -0.75*2*Math.PI].map(a => (a % (2*Math.PI) + 2*Math.PI) % (2*Math.PI));
 let targetPhases = [...GAITS.walk.phases];
 let K = 6.0;
 let omegaMult = 1.0;
@@ -315,7 +405,7 @@ let currentGait = "walk";
 let currentDataGait = "walk";
 
 function stepODE(dt) {
-  const phiStar = targetPhases.map(p => p * 2 * Math.PI);
+  const phiStar = targetPhases.map(p => -p * 2 * Math.PI); // negated: footfall phase -> oscillator offset
   const omega = BASE_OMEGA * omegaMult;
   const N = 4;
   const dTheta = new Array(N).fill(0);
@@ -332,6 +422,57 @@ function stepODE(dt) {
     theta[i] = (theta[i] + dt * dTheta[i]) % (2 * Math.PI);
     if (theta[i] < 0) theta[i] += 2 * Math.PI;
   }
+}
+
+// ============================================================
+// Hoofbeat audio (Web Audio, synthesized — no sound files)
+// Hinds are pitched lower than fronts, like real hoofbeats.
+// Off by default; the button click creates/resumes the
+// AudioContext, which browsers require to happen on a gesture.
+// ============================================================
+let audioCtx = null;
+let soundOn = false;
+let noiseBuf = null;
+const LIMB_THUMP_HZ = [82, 88, 118, 126]; // LH, RH, LF, RF
+
+function ensureAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const len = Math.floor(audioCtx.sampleRate * 0.04);
+    noiseBuf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2);
+  }
+  if (audioCtx.state === "suspended") audioCtx.resume();
+}
+
+function playClop(limbIndex) {
+  if (!soundOn || !audioCtx || audioCtx.state !== "running") return;
+  const t = audioCtx.currentTime;
+  // Low "thump": short pitched sine with a quick downward sweep
+  const osc = audioCtx.createOscillator();
+  const oscGain = audioCtx.createGain();
+  const f = LIMB_THUMP_HZ[limbIndex];
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(f * 1.8, t);
+  osc.frequency.exponentialRampToValueAtTime(f, t + 0.06);
+  oscGain.gain.setValueAtTime(0.45, t);
+  oscGain.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+  osc.connect(oscGain).connect(audioCtx.destination);
+  osc.start(t);
+  osc.stop(t + 0.18);
+  // Hoof-contact "clip": tiny band-passed noise burst, fronts a touch brighter
+  const src = audioCtx.createBufferSource();
+  const bp = audioCtx.createBiquadFilter();
+  const nGain = audioCtx.createGain();
+  src.buffer = noiseBuf;
+  bp.type = "bandpass";
+  bp.frequency.value = limbIndex >= 2 ? 1900 : 1400;
+  bp.Q.value = 1.2;
+  nGain.gain.setValueAtTime(0.22, t);
+  nGain.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+  src.connect(bp).connect(nGain).connect(audioCtx.destination);
+  src.start(t);
 }
 
 // ============================================================
@@ -449,46 +590,79 @@ function drawPhaseCircle() {
   ctx.fillRect(0, 0, w, h);
 
   const cx = w / 2, cy = h / 2;
-  const R = Math.min(w, h) * 0.38;
+  const R = Math.min(w, h) * 0.42;
+  // One concentric "lane" per limb so the dots never cover each other,
+  // even when legs move in perfect pairs (trot, pace, or the canter's RH+LF).
+  const laneR = [1.0, 0.85, 0.70, 0.55].map(f => R * f);
+  const dotR = Math.max(4.5, R * 0.055);
+  const duty = currentDuty();
+  const top = -Math.PI / 2; // phase 0 = 12 o'clock
 
-  // Circle
-  ctx.strokeStyle = "#ccc";
-  ctx.lineWidth = 1.5;
+  // Shaded "on the ground" slice: phase 0 → duty, clockwise from the top.
+  // A dot inside this slice = that hoof is in stance right now.
+  const rOut = laneR[0] + dotR + 4;
+  const rIn = Math.max(4, laneR[3] - dotR - 4);
   ctx.beginPath();
-  ctx.arc(cx, cy, R, 0, 2*Math.PI);
+  ctx.arc(cx, cy, rOut, top, top + duty * 2 * Math.PI);
+  ctx.arc(cx, cy, rIn, top + duty * 2 * Math.PI, top, true);
+  ctx.closePath();
+  ctx.fillStyle = "rgba(141, 110, 99, 0.16)";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(141, 110, 99, 0.45)";
+  ctx.lineWidth = 1;
   ctx.stroke();
 
-  // Phase marks at target phases (dashed)
+  // Sector labels
+  ctx.font = "600 13px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const labelR = (rOut + rIn) / 2;
+  const midGround = top + duty * Math.PI;
+  const midAir = top + Math.PI * (1 + duty);
+  ctx.fillStyle = "#6d4c41";
+  ctx.fillText("on the ground", cx + Math.cos(midGround) * labelR, cy + Math.sin(midGround) * labelR);
+  ctx.fillStyle = "#90a4ae";
+  ctx.fillText("in the air", cx + Math.cos(midAir) * labelR, cy + Math.sin(midAir) * labelR);
+
+  // Faint lane guide circles
+  laneR.forEach(r => {
+    ctx.strokeStyle = "#e4e0d8";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+    ctx.stroke();
+  });
+
+  // Dashed spokes at each limb's target phase
   LIMB_NAMES.forEach((limb, i) => {
-    const a = targetPhases[i] * 2 * Math.PI - Math.PI/2;
+    const a = -targetPhases[i] * 2 * Math.PI + top; // negated to match where the dots settle
     ctx.strokeStyle = LIMB_COLORS[limb];
+    ctx.globalAlpha = 0.5;
     ctx.setLineDash([3, 3]);
     ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(cx + Math.cos(a)*R, cy + Math.sin(a)*R);
+    ctx.moveTo(cx + Math.cos(a) * rIn, cy + Math.sin(a) * rIn);
+    ctx.lineTo(cx + Math.cos(a) * rOut, cy + Math.sin(a) * rOut);
     ctx.stroke();
   });
   ctx.setLineDash([]);
+  ctx.globalAlpha = 1;
 
-  // Current oscillator positions
+  // Current oscillator positions: solid dot = stance, hollow dot = swing
   LIMB_NAMES.forEach((limb, i) => {
-    const a = theta[i] - Math.PI/2;
-    const x = cx + Math.cos(a) * R;
-    const y = cy + Math.sin(a) * R;
+    const phase = ((theta[i] / (2 * Math.PI)) % 1 + 1) % 1;
+    const inStance = phase < duty;
+    const a = theta[i] + top;
+    const x = cx + Math.cos(a) * laneR[i];
+    const y = cy + Math.sin(a) * laneR[i];
     ctx.beginPath();
-    ctx.arc(x, y, 9, 0, 2*Math.PI);
-    ctx.fillStyle = LIMB_COLORS[limb];
+    ctx.arc(x, y, inStance ? dotR + 1 : dotR, 0, 2 * Math.PI);
+    ctx.fillStyle = inStance ? LIMB_COLORS[limb] : "#fafafa";
     ctx.fill();
-    ctx.strokeStyle = "white";
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = LIMB_COLORS[limb];
+    ctx.lineWidth = inStance ? 2 : 2.5;
     ctx.stroke();
   });
 
-  // Equation text
-  ctx.fillStyle = "#666";
-  ctx.font = "11px ui-monospace, monospace";
-  ctx.textAlign = "left";
-  ctx.fillText("dθᵢ/dt = ω + (K/3) Σⱼ≠ᵢ sin((θⱼ−θᵢ) − (φⱼ*−φᵢ*))", 8, h - 8);
 }
 
 // ============================================================
@@ -512,6 +686,7 @@ function updateStanceHistory() {
     const inStance = p < duty;
     if (inStance && stanceActive[i] === null) {
       stanceActive[i] = simPhase;
+      playClop(i);
     } else if (!inStance && stanceActive[i] !== null) {
       stanceEvents[i].push({ start: stanceActive[i], end: simPhase });
       stanceActive[i] = null;
@@ -708,7 +883,9 @@ document.getElementById("kSlider").addEventListener("input", e => {
 });
 document.getElementById("wSlider").addEventListener("input", e => {
   omegaMult = parseFloat(e.target.value);
-  document.getElementById("wVal").textContent = omegaMult.toFixed(2) + "\u00d7";
+  const spm = Math.round((BASE_OMEGA * omegaMult) / (2 * Math.PI) * 60);
+  document.getElementById("wVal").textContent =
+    omegaMult.toFixed(2) + "\u00d7 \u00b7 " + spm + " strides/min";
 });
 document.getElementById("dSlider").addEventListener("input", e => {
   userDuty = parseFloat(e.target.value);
@@ -723,16 +900,29 @@ document.getElementById("dSlider").addEventListener("input", e => {
   });
 });
 
-document.getElementById("customBtn").addEventListener("click", () => {
-  const panel = document.getElementById("customPhases");
-  const btn = document.getElementById("customBtn");
-  if (panel.style.display === "none") {
-    panel.style.display = "block";
-    btn.textContent = "Hide custom phase sliders \u25b2";
-  } else {
-    panel.style.display = "none";
-    btn.textContent = "Show custom phase sliders \u25bc";
-  }
+document.getElementById("soundBtn").addEventListener("click", () => {
+  ensureAudio();
+  soundOn = !soundOn;
+  const btn = document.getElementById("soundBtn");
+  btn.classList.toggle("on", soundOn);
+  btn.textContent = soundOn ? "\ud83d\udd0a Hoofbeats: on" : "\ud83d\udd07 Hoofbeats: off \u2014 tap to listen";
+});
+
+// Scatter: randomize the oscillator phases (targets untouched) so students
+// can watch the coupling K pull the legs back into the gait pattern.
+document.getElementById("scatterBtn").addEventListener("click", () => {
+  for (let i = 0; i < 4; i++) theta[i] = Math.random() * 2 * Math.PI;
+});
+
+// Slow motion: one shared timescale applied to the frame dt in the main
+// loop, so the horse, footfall chart, phase clock, and hoofbeat timing
+// all slow together.
+let slowMo = false;
+document.getElementById("slowBtn").addEventListener("click", () => {
+  slowMo = !slowMo;
+  const btn = document.getElementById("slowBtn");
+  btn.classList.toggle("on", slowMo);
+  btn.textContent = slowMo ? "\ud83d\udc22 Slow motion: on" : "\ud83d\udc22 Slow motion";
 });
 
 document.querySelectorAll(".dataTab").forEach(btn => {
@@ -751,9 +941,15 @@ document.querySelectorAll(".dataTab").forEach(btn => {
 // Main animation loop
 // ============================================================
 let lastTime = performance.now();
+let frameCount = 0;
+const syncValEl = document.getElementById("syncVal");
+const syncFillEl = document.getElementById("syncFill");
 function loop(t) {
-  const dt = Math.min(0.05, (t - lastTime) / 1000);
+  let dt = Math.min(0.05, (t - lastTime) / 1000);
   lastTime = t;
+  // Slow motion scales the one shared dt (applied once, before any use),
+  // so the ODE, playhead, clock, and hoofbeat timing all slow together.
+  if (slowMo) dt *= 0.25;
   const substeps = 4;
   for (let s = 0; s < substeps; s++) stepODE(dt / substeps);
 
@@ -763,6 +959,22 @@ function loop(t) {
 
   // Record actual stance events from the live oscillator state
   updateStanceHistory();
+
+  // Sync meter: Kuramoto-style order parameter relative to the target
+  // pattern, r = |Σ_j exp(i(θ_j − φ*_j))| / 4 ∈ [0,1]. DOM updates are
+  // throttled to every 6th frame to avoid layout thrash.
+  frameCount++;
+  if (frameCount % 6 === 0) {
+    let sx = 0, sy = 0;
+    for (let i = 0; i < 4; i++) {
+      const d = theta[i] - targetPhases[i] * 2 * Math.PI;
+      sx += Math.cos(d);
+      sy += Math.sin(d);
+    }
+    const pct = Math.round(Math.sqrt(sx * sx + sy * sy) / 4 * 100);
+    syncValEl.textContent = pct + "%";
+    syncFillEl.style.width = pct + "%";
+  }
 
   drawHorse();
   drawFootfall();
